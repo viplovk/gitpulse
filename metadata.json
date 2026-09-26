@@ -1,0 +1,6 @@
+{
+  "name": "GitPulse - Automated GitHub Repository Maintenance",
+  "description": "Connect GitHub, define legitimate repository maintenance, and let GitPulse automate workflows with scheduled GitHub Actions.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

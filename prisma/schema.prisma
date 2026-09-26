@@ -1,0 +1,115 @@
+// Prisma schema for GitPulse
+// Learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String          @id @default(uuid())
+  githubUserId String          @unique
+  username     String
+  avatarUrl    String?
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+  accounts     GitHubAccount[]
+
+  @@map("users")
+}
+
+model GitHubAccount {
+  id                   String       @id @default(uuid())
+  userId               String
+  user                 User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  githubUserId         String       @unique
+  username             String
+  encryptedAccessToken String
+  createdAt            DateTime     @default(now())
+  updatedAt            DateTime     @updatedAt
+  repositories         Repository[]
+
+  @@map("github_accounts")
+}
+
+enum MaintenanceStrategy {
+  DAILY_LOG
+  CHANGELOG
+  STATS_JSON
+  CUSTOM_SCRIPT
+}
+
+enum ExecutionStatus {
+  QUEUED
+  RUNNING
+  SUCCESS
+  SKIPPED
+  FAILED
+  RETRYING
+}
+
+model Repository {
+  id                  String              @id @default(uuid())
+  githubAccountId     String
+  githubAccount       GitHubAccount       @relation(fields: [githubAccountId], references: [id], onDelete: Cascade)
+  githubRepoId        Int                 @unique
+  owner               String
+  name                String
+  fullName            String
+  defaultBranch       String              @default("main")
+  private             Boolean             @default(false)
+  enabled             Boolean             @default(false)
+  maintenanceStrategy MaintenanceStrategy @default(DAILY_LOG)
+  branch              String              @default("main")
+  commitMessageStyle  String              @default("chore: automated repository maintenance")
+  executionMode       String              @default("DIRECT_COMMIT") // DIRECT_COMMIT or PULL_REQUEST
+  createdAt           DateTime            @default(now())
+  updatedAt           DateTime            @updatedAt
+  schedules           Schedule[]
+  executions          Execution[]
+
+  @@index([owner, name])
+  @@map("repositories")
+}
+
+model Schedule {
+  id             String       @id @default(uuid())
+  repositoryId   String
+  repository     Repository   @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
+  cronExpression String       // e.g. "30 15 * * *" in UTC
+  timezone       String       @default("UTC")
+  enabled        Boolean      @default(true)
+  nextRunAt      DateTime?
+  lastRunAt      DateTime?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  executions     Execution[]
+
+  @@map("schedules")
+}
+
+model Execution {
+  id             String          @id @default(uuid())
+  repositoryId   String
+  repository     Repository      @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
+  scheduleId     String?
+  schedule       Schedule?       @relation(fields: [scheduleId], references: [id], onDelete: SetNull)
+  status         ExecutionStatus @default(QUEUED)
+  startedAt      DateTime        @default(now())
+  finishedAt     DateTime?
+  commitSha      String?
+  commitMessage  String?
+  filesChanged   Int             @default(0)
+  errorCode      String?
+  errorMessage   String?
+  retryCount     Int             @default(0)
+  logs           String?
+  createdAt      DateTime        @default(now())
+
+  @@index([repositoryId, createdAt])
+  @@map("executions")
+}
